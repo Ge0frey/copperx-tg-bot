@@ -145,8 +145,3 @@ Check application logs for detailed error information.
 
 For issues or inquiries, contact:
 - Telegram Community: https://t.me/copperxcommunity/2183
-- Email: support@copperx.io
-
-## License
-
-This project is proprietary software for Copperx.
