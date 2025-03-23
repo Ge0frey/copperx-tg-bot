@@ -31,7 +31,9 @@ export const handleTransferHistory = async (ctx: Context): Promise<void> => {
   const response = await getTransferHistory(chatId, 1, 10);
   
   // Clean up loading message
-  await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  if (ctx.chat) {
+    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  }
   
   if (response.status && response.data && response.data.data.length > 0) {
     const transfers = response.data.data;
@@ -153,7 +155,7 @@ export const handleTransferTypeCallback = async (ctx: Context): Promise<void> =>
 
 // Handle email transfer flow
 export const handleEmailTransferFlow = async (ctx: Context): Promise<void> => {
-  if (!('text' in ctx.message)) return;
+  if (!ctx.message || !('text' in ctx.message)) return;
   
   const chatId = ctx.chat?.id.toString() || '';
   const state = getState(chatId);
@@ -242,7 +244,7 @@ export const handleNetworkCallback = async (ctx: Context): Promise<void> => {
 
 // Handle amount input for transfers
 export const handleAmountInput = async (ctx: Context): Promise<void> => {
-  if (!('text' in ctx.message)) return;
+  if (!ctx.message || !('text' in ctx.message)) return;
   
   const chatId = ctx.chat?.id.toString() || '';
   const isAwaitingAmount = getTempData(chatId, 'awaitingAmount');
@@ -294,7 +296,7 @@ export const handleAmountInput = async (ctx: Context): Promise<void> => {
 
 // Handle message input for email transfers
 export const handleMessageInput = async (ctx: Context): Promise<void> => {
-  if (!('text' in ctx.message)) return;
+  if (!ctx.message || !('text' in ctx.message)) return;
   
   const chatId = ctx.chat?.id.toString() || '';
   const isAwaitingMessage = getTempData(chatId, 'awaitingMessage');
@@ -314,7 +316,7 @@ export const handleMessageInput = async (ctx: Context): Promise<void> => {
 
 // Handle wallet address input
 export const handleWalletAddressInput = async (ctx: Context): Promise<void> => {
-  if (!('text' in ctx.message)) return;
+  if (!ctx.message || !('text' in ctx.message)) return;
   
   const chatId = ctx.chat?.id.toString() || '';
   const state = getState(chatId);
@@ -369,7 +371,7 @@ export const handleWalletAddressInput = async (ctx: Context): Promise<void> => {
 
 // Handle bank transfer flow
 export const handleBankTransferFlow = async (ctx: Context): Promise<void> => {
-  if (!('text' in ctx.message)) return;
+  if (!ctx.message || !('text' in ctx.message)) return;
   
   const chatId = ctx.chat?.id.toString() || '';
   const state = getState(chatId);

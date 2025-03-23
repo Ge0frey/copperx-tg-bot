@@ -62,7 +62,7 @@ export const handleLogout = async (ctx: Context): Promise<void> => {
 
 // Handler for email input
 export const handleEmailInput = async (ctx: Context): Promise<void> => {
-  if (!('text' in ctx.message)) return;
+  if (!ctx.message || !('text' in ctx.message)) return;
   
   const chatId = ctx.chat?.id.toString() || '';
   const email = ctx.message.text.trim();
@@ -83,7 +83,9 @@ export const handleEmailInput = async (ctx: Context): Promise<void> => {
   const response = await requestEmailOtp(email);
   
   // Clean up loading message
-  await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  if (ctx.chat) {
+    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  }
   
   if (response.status) {
     // Store email in session
@@ -106,7 +108,7 @@ export const handleEmailInput = async (ctx: Context): Promise<void> => {
 
 // Handler for OTP input
 export const handleOtpInput = async (ctx: Context): Promise<void> => {
-  if (!('text' in ctx.message)) return;
+  if (!ctx.message || !('text' in ctx.message)) return;
   
   const chatId = ctx.chat?.id.toString() || '';
   const otp = ctx.message.text.trim();
@@ -128,7 +130,9 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
   const authResponse = await authenticateWithOtp(email, otp, chatId);
   
   // Clean up loading message
-  await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  if (ctx.chat) {
+    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  }
   
   if (authResponse.status && authResponse.data) {
     // Update session with user data
@@ -143,7 +147,7 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
     const profileResponse = await getUserProfile(chatId);
     
     // Setup Pusher for notifications
-    if (userData.organizationId) {
+    if (userData.organizationId && ctx.chat) {
       initializePusherClient(
         userData.organizationId, 
         chatId, 
@@ -192,7 +196,9 @@ export const handleProfile = async (ctx: Context): Promise<void> => {
   const response = await getUserProfile(chatId);
   
   // Clean up loading message
-  await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  if (ctx.chat) {
+    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  }
   
   if (response.status && response.data) {
     const userData = response.data;

@@ -95,6 +95,8 @@ bot.on('callback_query', async (ctx) => {
 
 // Handle text messages based on current state
 bot.on(message('text'), async (ctx) => {
+  if (!ctx.chat) return;
+  
   const chatId = ctx.chat.id.toString();
   const state = getState(chatId);
   

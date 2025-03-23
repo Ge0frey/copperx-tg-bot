@@ -5,8 +5,8 @@ import {
   getDefaultWallet, 
   setDefaultWallet 
 } from '../services/walletService';
-import { updateState, BotState } from '../models/types';
-import { getSession, setTempData } from '../utils/sessionManager';
+import { BotState } from '../models/types';
+import { getSession, setTempData, updateState } from '../utils/sessionManager';
 
 // Handler for /balance command
 export const handleBalance = async (ctx: Context): Promise<void> => {
@@ -19,7 +19,9 @@ export const handleBalance = async (ctx: Context): Promise<void> => {
   const balanceResponse = await getWalletBalances(chatId);
   
   // Clean up loading message
-  await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  if (ctx.chat) {
+    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  }
   
   if (balanceResponse.status && balanceResponse.data && balanceResponse.data.length > 0) {
     const balances = balanceResponse.data;
@@ -56,7 +58,9 @@ export const handleWallets = async (ctx: Context): Promise<void> => {
   const defaultWalletResponse = await getDefaultWallet(chatId);
   
   // Clean up loading message
-  await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  if (ctx.chat) {
+    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  }
   
   if (walletsResponse.status && walletsResponse.data && walletsResponse.data.length > 0) {
     const wallets = walletsResponse.data;
@@ -100,7 +104,9 @@ export const handleDeposit = async (ctx: Context): Promise<void> => {
   const walletsResponse = await getWallets(chatId);
   
   // Clean up loading message
-  await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  if (ctx.chat) {
+    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  }
   
   if (walletsResponse.status && walletsResponse.data && walletsResponse.data.length > 0) {
     const wallets = walletsResponse.data;
@@ -138,7 +144,9 @@ export const handleSetDefaultWallet = async (ctx: Context): Promise<void> => {
   const walletsResponse = await getWallets(chatId);
   
   // Clean up loading message
-  await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  if (ctx.chat) {
+    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+  }
   
   if (walletsResponse.status && walletsResponse.data && walletsResponse.data.length > 0) {
     const wallets = walletsResponse.data;
