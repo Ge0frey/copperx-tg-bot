@@ -37,6 +37,7 @@ export interface EmailOtpRequest {
 export interface EmailOtpAuthentication {
   email: string;
   otp: string;
+  sid?: string;
 }
 
 export interface AuthResponse {

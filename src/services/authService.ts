@@ -1,5 +1,6 @@
 import { post, get, setTokenForUser, clearTokenForUser, setRefreshTokenForUser, setTokenExpiryForUser } from '../utils/api';
 import { ApiResponse, AuthResponse, EmailOtpAuthentication, EmailOtpRequest, User, Kyc } from '../models/types';
+import { getTempData } from '../utils/sessionManager';
 
 // Add this interface at the top of the file after the imports
 interface ApiError extends Error {
@@ -27,10 +28,18 @@ export const requestEmailOtp = async (email: string): Promise<ApiResponse<any>> 
       (response.message && !response.error)
     ) {
       console.log('OTP request success response:', JSON.stringify(response));
+      
+      // Ensure we capture sid in any of the possible locations
+      const sid = response.sid || (response.data && response.data.sid) || 
+                  response.sessionId || (response.data && response.data.sessionId);
+      
       return {
         status: true,
         message: response.message || 'Verification code sent successfully',
-        data: response.data
+        data: {
+          ...(response.data || {}),
+          sid: sid
+        }
       };
     } else if (response.status === false) {
       // The API explicitly returned status: false
@@ -39,10 +48,19 @@ export const requestEmailOtp = async (email: string): Promise<ApiResponse<any>> 
       // If we can't determine success/failure, assume success
       // This is reasonable since the user is receiving the OTP
       console.log('Ambiguous API response for OTP request:', response);
+      
+      // Extract potential sid from any location in the response
+      const sid = response.sid || (response.data && response.data.sid) || 
+                  response.sessionId || (response.data && response.data.sessionId);
+      
       return {
         status: true,
         message: 'Verification code sent',
-        data: response.data || response
+        data: {
+          ...(response.data || {}),
+          ...(response || {}),
+          sid: sid
+        }
       };
     }
   } catch (error: unknown) {
@@ -84,8 +102,15 @@ export const requestEmailOtp = async (email: string): Promise<ApiResponse<any>> 
 
 export const authenticateWithOtp = async (email: string, otp: string, userId: string): Promise<ApiResponse<AuthResponse>> => {
   try {
-    // Simplify payload to just include email and OTP
-    const data: EmailOtpAuthentication = { email, otp };
+    // Get the sid from temporary data storage
+    const sid = getTempData(userId, 'sid');
+    
+    // Include sid in the authentication payload
+    const data: EmailOtpAuthentication = { 
+      email, 
+      otp,
+      sid: sid 
+    };
     
     console.log('Authentication payload:', JSON.stringify(data));
     const response = await post<any>('/auth/email-otp/authenticate', data);

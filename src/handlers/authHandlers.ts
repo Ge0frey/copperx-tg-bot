@@ -91,6 +91,12 @@ export const handleEmailInput = async (ctx: Context): Promise<void> => {
     // Store email in session
     setTempData(chatId, 'email', email);
     
+    // Store sid if available
+    if (response.data && response.data.sid) {
+      console.log('Found sid in response:', response.data.sid);
+      setTempData(chatId, 'sid', response.data.sid);
+    }
+    
     // Update state to wait for OTP
     updateState(chatId, BotState.AUTH_OTP);
     
