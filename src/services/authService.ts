@@ -1,6 +1,16 @@
 import { post, get, setTokenForUser, clearTokenForUser, setRefreshTokenForUser, setTokenExpiryForUser } from '../utils/api';
 import { ApiResponse, AuthResponse, EmailOtpAuthentication, EmailOtpRequest, User, Kyc } from '../models/types';
 
+// Add this interface at the top of the file after the imports
+interface ApiError extends Error {
+  response?: {
+    status?: number;
+    statusText?: string;
+    data?: any;
+  };
+  code?: string;
+}
+
 export const requestEmailOtp = async (email: string): Promise<ApiResponse<any>> => {
   try {
     const data: EmailOtpRequest = { email };
@@ -34,12 +44,13 @@ export const requestEmailOtp = async (email: string): Promise<ApiResponse<any>> 
         data: response.data || response
       };
     }
-  } catch (error: any) {
-    console.error('Error requesting email OTP:', error.response?.data || error.message);
+  } catch (error: unknown) {
+    const apiError = error as ApiError;
+    console.error('Error requesting email OTP:', apiError.response?.data || apiError.message);
     return {
       status: false,
-      message: error.response?.data?.message || 'Failed to request OTP. Please try again.',
-      error: error.response?.data || error,
+      message: apiError.response?.data?.message || 'Failed to request OTP. Please try again.',
+      error: apiError.response?.data || apiError,
     };
   }
 };
@@ -109,24 +120,25 @@ export const authenticateWithOtp = async (email: string, otp: string, userId: st
         error: response
       };
     }
-  } catch (error: any) {
-    console.error('Error authenticating with OTP:', error.response?.data || error.message);
+  } catch (error: unknown) {
+    const apiError = error as ApiError;
+    console.error('Error authenticating with OTP:', apiError.response?.data || apiError.message);
     
     // Enhanced error handling with more specific messages
     let errorMessage = 'Authentication failed. Please check your OTP and try again.';
     
-    if (error.response?.status === 401) {
+    if (apiError.response?.status === 401) {
       errorMessage = 'Invalid OTP code. Please check and try again.';
-    } else if (error.response?.status === 429) {
+    } else if (apiError.response?.status === 429) {
       errorMessage = 'Too many attempts. Please wait before trying again.';
-    } else if (error.response?.data?.message) {
-      errorMessage = error.response.data.message;
+    } else if (apiError.response?.data?.message) {
+      errorMessage = apiError.response.data.message;
     }
     
     return {
       status: false,
       message: errorMessage,
-      error: error.response?.data || error,
+      error: apiError.response?.data || apiError,
     };
   }
 };
@@ -134,18 +146,19 @@ export const authenticateWithOtp = async (email: string, otp: string, userId: st
 export const getUserProfile = async (userId: string): Promise<ApiResponse<User>> => {
   try {
     return await get<ApiResponse<User>>('/auth/me', {}, userId);
-  } catch (error: any) {
-    console.error('Error getting user profile:', error.response?.data || error.message);
+  } catch (error: unknown) {
+    const apiError = error as ApiError;
+    console.error('Error getting user profile:', apiError.response?.data || apiError.message);
     
     // If the error is due to unauthorized access, clear the token
-    if (error.response?.status === 401) {
+    if (apiError.response?.status === 401) {
       clearTokenForUser(userId);
     }
     
     return {
       status: false,
-      message: error.response?.data?.message || 'Failed to fetch user profile. Please log in again.',
-      error: error.response?.data || error,
+      message: apiError.response?.data?.message || 'Failed to fetch user profile. Please log in again.',
+      error: apiError.response?.data || apiError,
     };
   }
 };
@@ -153,12 +166,13 @@ export const getUserProfile = async (userId: string): Promise<ApiResponse<User>>
 export const getKycStatus = async (userId: string): Promise<ApiResponse<Kyc[]>> => {
   try {
     return await get<ApiResponse<Kyc[]>>('/kycs', {}, userId);
-  } catch (error: any) {
-    console.error('Error getting KYC status:', error.response?.data || error.message);
+  } catch (error: unknown) {
+    const apiError = error as ApiError;
+    console.error('Error getting KYC status:', apiError.response?.data || apiError.message);
     return {
       status: false,
-      message: error.response?.data?.message || 'Failed to fetch KYC status.',
-      error: error.response?.data || error,
+      message: apiError.response?.data?.message || 'Failed to fetch KYC status.',
+      error: apiError.response?.data || apiError,
     };
   }
 }; 

@@ -4,6 +4,14 @@ import { config } from '../config/env';
 import { ApiResponse } from '../models/types';
 import { Context } from 'telegraf';
 
+// Add interface for API Error
+interface ApiError extends Error {
+  response?: {
+    status?: number;
+    data?: any;
+  };
+}
+
 // Store active Pusher clients for each organization
 const activeClients: Record<string, Pusher> = {};
 
@@ -40,9 +48,10 @@ export const initializePusherClient = async (
             } else {
               callback(new Error('Pusher authentication failed'), null);
             }
-          } catch (error: any) {
-            console.error('Pusher authorization error:', error);
-            callback(error, null);
+          } catch (error: unknown) {
+            const apiError = error as ApiError;
+            console.error('Pusher authorization error:', apiError);
+            callback(apiError, null);
           }
         }
       })
@@ -58,7 +67,7 @@ export const initializePusherClient = async (
     });
 
     // Handle subscription error
-    channel.bind('pusher:subscription_error', (error: any) => {
+    channel.bind('pusher:subscription_error', (error: unknown) => {
       console.error('Subscription error:', error);
     });
 
@@ -69,13 +78,13 @@ export const initializePusherClient = async (
       // Format and send message to user
       const message = formatDepositMessage(data);
       bot.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' })
-        .catch((err: any) => console.error('Error sending deposit notification:', err));
+        .catch((err: unknown) => console.error('Error sending deposit notification:', err));
     });
 
     // Store the client for reuse
     activeClients[organizationId] = pusherClient;
     return pusherClient;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error initializing Pusher client:', error);
     return null;
   }
@@ -83,8 +92,13 @@ export const initializePusherClient = async (
 
 // Format deposit notification message
 const formatDepositMessage = (data: any): string => {
+  // Add safeguards for undefined data
+  if (!data) {
+    return `💰 *New Deposit Received*\n\nDetails not available`;
+  }
+  
   return `💰 *New Deposit Received*\n\n` +
-    `Amount: ${data.amount} ${data.asset || 'USDC'}\n` +
+    `Amount: ${data.amount || '0'} ${data.asset || 'USDC'}\n` +
     `Network: ${data.network || 'Unknown'}\n` +
     `Transaction Hash: \`${data.txHash || 'N/A'}\`\n` +
     `${data.timestamp ? `Time: ${new Date(data.timestamp).toLocaleString()}` : ''}`;

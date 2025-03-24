@@ -43,6 +43,18 @@ import {
   handleSupport
 } from './handlers/menuHandlers';
 
+// Add this interface at the top of the file after the imports
+interface ApiError extends Error {
+  response?: {
+    status?: number;
+    statusText?: string;
+    data?: {
+      message?: string;
+    };
+  };
+  code?: string;
+}
+
 // Check if required environment variables are set
 if (!validateEnv()) {
   console.error('Missing required environment variables. Exiting...');
@@ -128,22 +140,25 @@ bot.on(message('text'), async (ctx) => {
   }
 });
 
-// Error handling
+// Update the error handling
 bot.catch((err, ctx) => {
   // Enhanced error handling
   let errorMessage = 'An error occurred while processing your request.';
   
+  // Cast to ApiError with proper type safety
+  const apiError = err as ApiError;
+  
   // Log the full error
-  console.error(`Error for ${ctx.updateType}:`, err);
-  console.error('Error stack:', err.stack);
+  console.error(`Error for ${ctx.updateType}:`, apiError);
+  console.error('Error stack:', apiError.stack || 'No stack trace available');
   
   // Provide more specific error messages based on error type
-  if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT' || err.code === 'ENOTFOUND') {
+  if (apiError.code === 'ECONNREFUSED' || apiError.code === 'ETIMEDOUT' || apiError.code === 'ENOTFOUND') {
     errorMessage = 'Unable to connect to the API server. Please try again later.';
-    console.error('API connection error:', err.message);
-  } else if (err.response && err.response.status) {
+    console.error('API connection error:', apiError.message);
+  } else if (apiError.response && apiError.response.status) {
     // Handle HTTP error codes
-    switch (err.response.status) {
+    switch (apiError.response.status) {
       case 401:
         errorMessage = 'Authentication error. Please login again with /login.';
         break;
@@ -160,11 +175,11 @@ bot.catch((err, ctx) => {
         errorMessage = 'The server is currently unavailable. Please try again later.';
         break;
       default:
-        errorMessage = `Error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
+        errorMessage = `Error (${apiError.response.status}): ${apiError.response.data?.message || 'Unknown error'}`;
     }
-  } else if (err.message && typeof err.message === 'string') {
+  } else if (apiError.message && typeof apiError.message === 'string') {
     // Include the error message if it's available and helpful
-    const sanitizedMessage = err.message
+    const sanitizedMessage = apiError.message
       .replace(/token=\w+/g, 'token=***') // Hide tokens in error messages
       .substring(0, 100); // Limit length for security
     

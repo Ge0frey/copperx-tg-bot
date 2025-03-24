@@ -1,6 +1,17 @@
 import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { config } from '../config/env';
 
+// Add these interfaces at the top of the file, after the imports
+interface ApiError extends Error {
+  response?: {
+    status?: number;
+    statusText?: string;
+    data?: any;
+  };
+  code?: string;
+  isAxiosError?: boolean;
+}
+
 const apiClient = axios.create({
   baseURL: config.apiBaseUrl,
   headers: {
@@ -118,8 +129,10 @@ export const apiRequest = async <T>(
 
     // Log request details (excluding sensitive data)
     const logData = { ...data };
-    if (logData.password) logData.password = '********';
-    if (logData.otp) logData.otp = '****';
+    if (logData && typeof logData === 'object') {
+      if (logData.password) logData.password = '********';
+      if (logData.otp) logData.otp = '****';
+    }
     console.log(`API Request: ${method} ${url}`, { 
       params: requestConfig.params, 
       data: logData,
@@ -136,22 +149,25 @@ export const apiRequest = async <T>(
       status: response.status,
       statusText: response.statusText,
       // Only log the structure of the response data, not the full content for large responses
-      dataStructure: response.data ? Object.keys(response.data) : null
+      dataStructure: response.data ? Object.keys(response.data as any) : null
     });
     
     return response.data;
-  } catch (error: any) {
-    // Enhanced error logging
+  } catch (error: unknown) {
+    // Cast to ApiError type with safety checks
+    const apiError = error as ApiError;
+    
+    // Enhanced error logging with safe property access
     console.error(`API Error: ${method} ${url}`, {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message,
-      code: error.code
+      status: apiError.response?.status,
+      statusText: apiError.response?.statusText,
+      data: apiError.response?.data,
+      message: apiError.message,
+      code: apiError.code
     });
     
     // Console.log a stack trace for debugging
-    console.error('Error stack:', error.stack);
+    console.error('Error stack:', apiError.stack);
     
     throw error;
   }
