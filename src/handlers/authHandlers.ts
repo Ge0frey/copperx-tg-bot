@@ -212,12 +212,15 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
     
     // Give more helpful guidance based on the error
     let helpText = '';
-    if (errorMsg.toLowerCase().includes('invalid')) {
-      helpText = 'Double-check the code and try again.';
-    } else if (errorMsg.toLowerCase().includes('expired')) {
-      helpText = 'The code has expired. Please request a new one with /login.';
-    } else if (errorMsg.toLowerCase().includes('attempt')) {
-      helpText = 'Too many attempts. Please try again later with /login.';
+    if (typeof errorMsg === 'string') {
+      const lowerErrorMsg = errorMsg.toLowerCase();
+      if (lowerErrorMsg.includes('invalid')) {
+        helpText = 'Double-check the code and try again.';
+      } else if (lowerErrorMsg.includes('expired')) {
+        helpText = 'The code has expired. Please request a new one with /login.';
+      } else if (lowerErrorMsg.includes('attempt')) {
+        helpText = 'Too many attempts. Please try again later with /login.';
+      }
     }
     
     await ctx.reply(
