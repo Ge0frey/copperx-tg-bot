@@ -30,7 +30,18 @@ export const getSession = (chatId: string): UserSession => {
 // Check if user is authenticated
 export const isAuthenticated = (chatId: string): boolean => {
   const session = getSession(chatId);
-  return !!session.organizationId;
+  
+  // Explicitly check if authenticated is true or if there's an organizationId
+  const isAuth = session.authenticated === true || !!session.organizationId;
+  
+  // Update the session's authenticated property if needed
+  if (isAuth && !session.authenticated) {
+    setSession(chatId, { authenticated: true });
+  } else if (!isAuth && session.authenticated) {
+    setSession(chatId, { authenticated: false });
+  }
+  
+  return isAuth;
 };
 
 // Clear a user session (logout)

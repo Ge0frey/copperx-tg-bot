@@ -27,13 +27,26 @@ const tokenExpiry: Record<string, number> = {}; // Store token expiry timestamps
 // Add a request interceptor to include tokens
 apiClient.interceptors.request.use(
   (config) => {
-    const token = getTokenForUser(config.params?.userId);
+    const userId = config.params?.userId;
+    const token = getTokenForUser(userId);
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      
+      // Log authentication information
+      console.log(`[API] Request with authentication for user ${userId}`);
+    } else if (userId) {
+      console.log(`[API] Request without token for user ${userId}`);
     }
+    
+    // Add timestamp to help match logs
+    const timestamp = new Date().toISOString();
+    console.log(`[API] ${timestamp} Request: ${config.method?.toUpperCase()} ${config.url}`);
+    
     return config;
   },
   (error) => {
+    console.error('[API] Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
@@ -119,6 +132,8 @@ export const apiRequest = async <T>(
       method,
       url,
       params: { ...config?.params, userId },
+      // Increase timeout for slower connections
+      timeout: 15000, // 15 seconds
     };
 
     if (data && (method.toLowerCase() === 'post' || method.toLowerCase() === 'put')) {
@@ -133,7 +148,7 @@ export const apiRequest = async <T>(
       if (logData.password) logData.password = '********';
       if (logData.otp) logData.otp = '****';
     }
-    console.log(`API Request: ${method} ${url}`, { 
+    console.log(`[API] Request: ${method} ${url}`, { 
       params: requestConfig.params, 
       data: logData,
       headers: { 
@@ -144,15 +159,18 @@ export const apiRequest = async <T>(
 
     const response: AxiosResponse<T> = await apiClient(requestConfig);
     
-    // Log successful response
-    console.log(`API Response: ${method} ${url}`, {
+    // Log successful response status but not the entire data payload
+    console.log(`[API] Response: ${method} ${url}`, {
       status: response.status,
       statusText: response.statusText,
-      // Log more details for debugging unexpected response formats
-      data: typeof response.data === 'object' ? JSON.stringify(response.data) : response.data,
-      // Only log the structure of the response data, not the full content for large responses
-      dataStructure: response.data ? Object.keys(response.data as any) : null
+      // Only log response structure, not actual data which may be large
+      dataKeys: response.data ? Object.keys(response.data as any) : null
     });
+    
+    // For auth/me endpoint, log more details for debugging
+    if (url === '/auth/me') {
+      console.log(`[API] Profile response structure: ${JSON.stringify(response.data, null, 2)}`);
+    }
     
     return response.data;
   } catch (error: unknown) {
@@ -160,7 +178,7 @@ export const apiRequest = async <T>(
     const apiError = error as ApiError;
     
     // Enhanced error logging with safe property access
-    console.error(`API Error: ${method} ${url}`, {
+    console.error(`[API] Error: ${method} ${url}`, {
       status: apiError.response?.status,
       statusText: apiError.response?.statusText,
       data: apiError.response?.data,
@@ -168,8 +186,34 @@ export const apiRequest = async <T>(
       code: apiError.code
     });
     
+    // Special case for auth/me endpoint
+    if (url === '/auth/me') {
+      console.error(`[API] Profile fetch error details:`, {
+        responseData: apiError.response?.data,
+        errorMessage: apiError.message,
+        errorCode: apiError.code,
+        isAxiosError: apiError.isAxiosError
+      });
+    }
+    
+    // Check for network errors
+    if (apiError.code === 'ECONNREFUSED' || apiError.code === 'ENOTFOUND' || apiError.code === 'ETIMEDOUT') {
+      console.error(`[API] Network error: ${apiError.code}`);
+      
+      // Construct a friendlier error object for network issues
+      const modifiedError: ApiError = new Error('Cannot connect to the server. Please check your internet connection.');
+      modifiedError.code = apiError.code;
+      modifiedError.response = {
+        status: 503,
+        statusText: 'Service Unavailable',
+        data: { message: 'Cannot connect to the server' }
+      };
+      
+      throw modifiedError;
+    }
+    
     // Console.log a stack trace for debugging
-    console.error('Error stack:', apiError.stack);
+    console.error('[API] Error stack:', apiError.stack);
     
     throw error;
   }

@@ -3,6 +3,7 @@ export interface UserSession {
   userId: string;
   email?: string;
   organizationId?: string;
+  authenticated?: boolean;
   currentState?: BotState;
   lastAction?: Date;
   tempData?: Record<string, any>;

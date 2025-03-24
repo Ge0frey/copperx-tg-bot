@@ -1,4 +1,4 @@
-import { post, get, setTokenForUser, clearTokenForUser, setRefreshTokenForUser, setTokenExpiryForUser } from '../utils/api';
+import { post, get, setTokenForUser, clearTokenForUser, setRefreshTokenForUser, setTokenExpiryForUser, getTokenForUser } from '../utils/api';
 import { ApiResponse, AuthResponse, EmailOtpAuthentication, EmailOtpRequest, User, Kyc } from '../models/types';
 import { getTempData } from '../utils/sessionManager';
 
@@ -311,19 +311,82 @@ export const authenticateWithOtp = async (email: string, otp: string, userId: st
 
 export const getUserProfile = async (userId: string): Promise<ApiResponse<User>> => {
   try {
-    return await get<ApiResponse<User>>('/auth/me', {}, userId);
+    console.log(`[Profile] Fetching profile for user ID: ${userId}`);
+    
+    // Check if we have a token for this user
+    const token = getTokenForUser(userId);
+    if (!token) {
+      console.error(`[Profile] No auth token found for user ${userId}`);
+      return {
+        status: false,
+        message: 'You are not logged in. Please use /login to authenticate.',
+        error: null
+      };
+    }
+    
+    const response = await get<any>('/auth/me', {}, userId);
+    console.log(`[Profile] Profile API response:`, JSON.stringify(response, null, 2));
+    
+    // Check if the response contains user data
+    if (response && (response.data || response.user)) {
+      // Normalize the response to ensure it matches our expected format
+      const userData = response.data || response.user || response;
+      
+      return {
+        status: true,
+        message: 'Profile fetched successfully',
+        data: userData
+      };
+    } else {
+      // Handle case where the response doesn't contain expected data shape
+      console.error(`[Profile] Unexpected response format:`, JSON.stringify(response, null, 2));
+      return {
+        status: false,
+        message: 'The server returned an unexpected response format',
+        error: response
+      };
+    }
   } catch (error: unknown) {
     const apiError = error as ApiError;
-    console.error('Error getting user profile:', apiError.response?.data || apiError.message);
+    
+    // Enhanced error logging
+    console.error('[Profile] Error getting user profile:');
+    console.error('Status:', apiError.response?.status);
+    console.error('Status Text:', apiError.response?.statusText);
+    console.error('Data:', JSON.stringify(apiError.response?.data, null, 2));
+    console.error('Message:', apiError.message);
+    console.error('Code:', apiError.code);
     
     // If the error is due to unauthorized access, clear the token
     if (apiError.response?.status === 401) {
+      console.log(`[Profile] Clearing token for user ${userId} due to 401 unauthorized`);
       clearTokenForUser(userId);
+      
+      return {
+        status: false,
+        message: 'Your session has expired. Please log in again with /login',
+        error: apiError.response?.data || apiError,
+      };
+    }
+    
+    // Create a more descriptive error message based on the error type
+    let errorMessage = 'Failed to fetch user profile.';
+    
+    if (apiError.code === 'ECONNREFUSED' || apiError.code === 'ENOTFOUND') {
+      errorMessage = 'Could not connect to the server. Please try again later.';
+    } else if (apiError.response?.status === 404) {
+      errorMessage = 'Profile data not found. Your account might not be set up correctly.';
+    } else if (apiError.response?.status === 500) {
+      errorMessage = 'Server error occurred. Please try again later.';
+    } else if (apiError.response?.data?.message) {
+      errorMessage = apiError.response.data.message;
+    } else if (apiError.message) {
+      errorMessage = apiError.message;
     }
     
     return {
       status: false,
-      message: apiError.response?.data?.message || 'Failed to fetch user profile. Please log in again.',
+      message: errorMessage,
       error: apiError.response?.data || apiError,
     };
   }

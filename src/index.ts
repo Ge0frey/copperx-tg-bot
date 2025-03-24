@@ -5,6 +5,7 @@ import { BotState } from './models/types';
 import { getState } from './utils/sessionManager';
 import { requireAuth, refreshUserProfile } from './middlewares/authMiddleware';
 import { disconnectAllPusherClients } from './services/notificationService';
+import express from 'express';
 
 // Import handlers
 import {
@@ -207,21 +208,50 @@ const startBot = async () => {
       const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN;
       
       if (WEBHOOK_DOMAIN) {
+        // Create an Express app
+        const app = express();
+        
+        // Add the health check endpoint
+        app.get('/health', (req, res) => {
+          res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+        });
+        
         // Set webhook with correct path that ends with '/webhook'
         const webhookPath = '/webhook';
         await bot.telegram.setWebhook(`${WEBHOOK_DOMAIN}${webhookPath}`);
         
-        // Start webhook with the correct path
-        // @ts-ignore
-        bot.startWebhook(webhookPath, null, PORT);
+        // Use the bot as middleware for the webhook
+        app.use(bot.webhookCallback(webhookPath));
         
-        console.log(`Bot is running in webhook mode on port ${PORT}`);
+        // Start the server
+        app.listen(PORT, () => {
+          console.log(`Bot is running in webhook mode on port ${PORT}`);
+          console.log(`Health check available at http://localhost:${PORT}/health`);
+        });
       } else {
         // Fallback to long polling if webhook domain is not set
         await bot.launch();
         console.log('Bot is running in long polling mode (production)');
       }
     } else {
+      // Create an Express app for development health check
+      const app = express();
+      const PORT = process.env.PORT || 3000;
+      
+      // Add the health check endpoint
+      app.get('/health', (req, res) => {
+        res.status(200).json({ 
+          status: 'ok', 
+          timestamp: new Date().toISOString(),
+          mode: 'development'
+        });
+      });
+      
+      // Start the Express server for health checks in development
+      app.listen(PORT, () => {
+        console.log(`Health check server running on port ${PORT}`);
+      });
+      
       // Use long polling in development
       await bot.launch();
       console.log('Bot is running in long polling mode (development)');

@@ -168,6 +168,7 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
     setSession(chatId, {
       email: userData.email,
       organizationId: userData.organizationId,
+      authenticated: true,
       currentState: BotState.MAIN_MENU,
     });
     
@@ -321,43 +322,78 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
 export const handleProfile = async (ctx: Context): Promise<void> => {
   const chatId = ctx.chat?.id.toString() || '';
   
+  // Check if user is logged in
+  const session = getSession(chatId);
+  if (!session || !session.authenticated) {
+    await ctx.reply(
+      `❌ You need to be logged in to view your profile.\n\n` +
+      `Please use /login to authenticate with your Copperx account.`
+    );
+    return;
+  }
+  
   // Show loading indicator
   const loadingMessage = await ctx.reply(`Fetching your profile...`);
   
-  // Get user profile from API
-  const response = await getUserProfile(chatId);
-  
-  // Clean up loading message
-  if (ctx.chat) {
-    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
-  }
-  
-  if (response.status && response.data) {
-    const userData = response.data;
+  try {
+    // Get user profile from API
+    const response = await getUserProfile(chatId);
     
-    // Fetch KYC status
-    const kycResponse = await getKycStatus(chatId);
-    let kycStatus = 'Unknown';
-    
-    if (kycResponse.status && kycResponse.data) {
-      const kycs = kycResponse.data;
-      const approvedKyc = kycs.find(kyc => kyc.status === 'approved');
-      kycStatus = approvedKyc ? 'Approved' : 'Not approved';
+    // Clean up loading message
+    if (ctx.chat) {
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
     }
     
+    if (response.status && response.data) {
+      const userData = response.data;
+      
+      // Fetch KYC status
+      const kycResponse = await getKycStatus(chatId);
+      let kycStatus = 'Unknown';
+      
+      if (kycResponse.status && kycResponse.data) {
+        const kycs = kycResponse.data;
+        const approvedKyc = kycs.find(kyc => kyc.status === 'approved');
+        kycStatus = approvedKyc ? 'Approved ✅' : 'Not approved ❌';
+      }
+      
+      await ctx.reply(
+        `👤 *User Profile*\n\n` +
+        `Email: ${userData.email || 'Not available'}\n` +
+        `Name: ${userData.name || 'Not set'}\n` +
+        `KYC Status: ${kycStatus}\n` +
+        `Organization ID: ${userData.organizationId || 'Not available'}\n` +
+        `Account Type: ${userData.role || 'User'}`,
+        { parse_mode: 'Markdown' }
+      );
+    } else {
+      // Handle specific error cases with actionable messages
+      let errorMessage = response.message || 'Unknown error';
+      let actionMessage = 'Please try again later or contact support.';
+      
+      if (errorMessage.includes('not logged in') || errorMessage.includes('expired')) {
+        actionMessage = 'Please use /login to authenticate again.';
+      } else if (errorMessage.includes('server')) {
+        actionMessage = 'This may be a temporary issue. Please try again in a few minutes.';
+      }
+      
+      await ctx.reply(
+        `❌ Failed to fetch profile: ${errorMessage}\n\n` +
+        `${actionMessage}\n\n` +
+        `Support: https://t.me/copperxcommunity/2183`
+      );
+    }
+  } catch (error) {
+    // Clean up loading message if still present
+    if (ctx.chat) {
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
+    }
+    
+    console.error('Unexpected error in handleProfile:', error);
+    
     await ctx.reply(
-      `👤 *User Profile*\n\n` +
-      `Email: ${userData.email}\n` +
-      `Name: ${userData.name || 'Not set'}\n` +
-      `KYC Status: ${kycStatus}\n` +
-      `Organization ID: ${userData.organizationId}\n` +
-      `Account Type: ${userData.role || 'User'}`,
-      { parse_mode: 'Markdown' }
-    );
-  } else {
-    await ctx.reply(
-      `❌ Failed to fetch profile: ${response.message || 'Unknown error'}\n\n` +
-      `Please try again or contact support.`
+      `❌ An unexpected error occurred while fetching your profile.\n\n` +
+      `Please try again later or contact support at https://t.me/copperxcommunity/2183`
     );
   }
 };
