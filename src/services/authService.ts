@@ -82,7 +82,7 @@ export const requestEmailOtp = async (email: string): Promise<ApiResponse<any>> 
   }
 };
 
-export const authenticateWithOtp = async (email: string, otp: string, userId: string, sessionId?: string): Promise<ApiResponse<AuthResponse>> => {
+export const authenticateWithOtp = async (email: string, otp: string, userId: string): Promise<ApiResponse<AuthResponse>> => {
   try {
     // Simplify payload to just include email and OTP
     const data: EmailOtpAuthentication = { email, otp };

@@ -399,7 +399,6 @@ function formatValidationErrors(errors: any[]): string {
 // Helper function to format property names (e.g., convert camelCase to Title Case)
 function formatPropertyName(property: string): string {
   // Special case for common acronyms
-  if (property.toLowerCase() === 'sid') return 'Session ID';
   if (property.toLowerCase() === 'otp') return 'Verification code';
   if (property.toLowerCase() === 'id') return 'ID';
   
