@@ -116,10 +116,43 @@ export const apiRequest = async <T>(
       requestConfig.params = { ...requestConfig.params, ...data };
     }
 
+    // Log request details (excluding sensitive data)
+    const logData = { ...data };
+    if (logData.password) logData.password = '********';
+    if (logData.otp) logData.otp = '****';
+    console.log(`API Request: ${method} ${url}`, { 
+      params: requestConfig.params, 
+      data: logData,
+      headers: { 
+        ...requestConfig.headers,
+        Authorization: requestConfig.headers?.Authorization ? 'Bearer ********' : undefined
+      }
+    });
+
     const response: AxiosResponse<T> = await apiClient(requestConfig);
+    
+    // Log successful response
+    console.log(`API Response: ${method} ${url}`, {
+      status: response.status,
+      statusText: response.statusText,
+      // Only log the structure of the response data, not the full content for large responses
+      dataStructure: response.data ? Object.keys(response.data) : null
+    });
+    
     return response.data;
   } catch (error: any) {
-    console.error(`API Error: ${method} ${url}`, error.response?.data || error.message);
+    // Enhanced error logging
+    console.error(`API Error: ${method} ${url}`, {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+      code: error.code
+    });
+    
+    // Console.log a stack trace for debugging
+    console.error('Error stack:', error.stack);
+    
     throw error;
   }
 };

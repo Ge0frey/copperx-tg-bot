@@ -96,12 +96,26 @@ export const handleEmailInput = async (ctx: Context): Promise<void> => {
     
     await ctx.reply(
       `✅ Verification code sent to ${email}.\n\n` +
-      `Please enter the verification code to complete login.`
+      `Please enter the verification code to complete login.\n\n` +
+      `(Check your spam folder if you don't see it in your inbox)`
     );
   } else {
+    // Log the full error for debugging
+    console.error('OTP request error:', response);
+    
+    // Get a more specific error message if available
+    let errorMsg = response.message || 'Unknown error';
+    
+    // Additional specific error handling
+    if (errorMsg.includes('rate limit') || errorMsg.includes('too many requests')) {
+      errorMsg = 'Too many attempts. Please wait before trying again.';
+    } else if (errorMsg.includes('not found') || errorMsg.includes('doesn\'t exist')) {
+      errorMsg = 'Email not registered. Please check your email or register first.';
+    }
+    
     await ctx.reply(
-      `❌ Failed to send verification code: ${response.message || 'Unknown error'}\n\n` +
-      `Please try again or contact support.`
+      `❌ Failed to send verification code: ${errorMsg}\n\n` +
+      `Please try again or contact support at https://t.me/copperxcommunity/2183`
     );
   }
 };
@@ -119,6 +133,14 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
   if (!email) {
     await ctx.reply(
       `Session expired. Please start the login process again with /login.`
+    );
+    return;
+  }
+  
+  // Basic OTP validation (should be numeric and a reasonable length)
+  if (!/^\d{4,8}$/.test(otp)) {
+    await ctx.reply(
+      `The verification code should be a 4-8 digit number. Please check and try again.`
     );
     return;
   }
@@ -153,7 +175,15 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
         chatId, 
         ctx.telegram, 
         ctx.chat.id
-      );
+      ).then(client => {
+        if (client) {
+          console.log('Pusher client initialized successfully');
+        } else {
+          console.error('Failed to initialize Pusher client');
+        }
+      }).catch(err => {
+        console.error('Error initializing Pusher:', err);
+      });
     }
     
     // Check KYC status
@@ -178,9 +208,22 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
       { parse_mode: 'Markdown' }
     );
   } else {
+    const errorMsg = authResponse.message || 'Invalid code';
+    
+    // Give more helpful guidance based on the error
+    let helpText = '';
+    if (errorMsg.toLowerCase().includes('invalid')) {
+      helpText = 'Double-check the code and try again.';
+    } else if (errorMsg.toLowerCase().includes('expired')) {
+      helpText = 'The code has expired. Please request a new one with /login.';
+    } else if (errorMsg.toLowerCase().includes('attempt')) {
+      helpText = 'Too many attempts. Please try again later with /login.';
+    }
+    
     await ctx.reply(
-      `❌ Verification failed: ${authResponse.message || 'Invalid code'}\n\n` +
-      `Please try again or restart the process with /login.`
+      `❌ Verification failed: ${errorMsg}\n\n` +
+      `${helpText}\n` +
+      `Use /login to restart the process if needed.`
     );
   }
 };

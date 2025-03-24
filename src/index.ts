@@ -130,8 +130,56 @@ bot.on(message('text'), async (ctx) => {
 
 // Error handling
 bot.catch((err, ctx) => {
+  // Enhanced error handling
+  let errorMessage = 'An error occurred while processing your request.';
+  
+  // Log the full error
   console.error(`Error for ${ctx.updateType}:`, err);
-  ctx.reply('An error occurred while processing your request. Please try again later or contact support.').catch(() => {});
+  console.error('Error stack:', err.stack);
+  
+  // Provide more specific error messages based on error type
+  if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT' || err.code === 'ENOTFOUND') {
+    errorMessage = 'Unable to connect to the API server. Please try again later.';
+    console.error('API connection error:', err.message);
+  } else if (err.response && err.response.status) {
+    // Handle HTTP error codes
+    switch (err.response.status) {
+      case 401:
+        errorMessage = 'Authentication error. Please login again with /login.';
+        break;
+      case 403:
+        errorMessage = 'You don\'t have permission to perform this action.';
+        break;
+      case 429:
+        errorMessage = 'Too many requests. Please try again later.';
+        break;
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        errorMessage = 'The server is currently unavailable. Please try again later.';
+        break;
+      default:
+        errorMessage = `Error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
+    }
+  } else if (err.message && typeof err.message === 'string') {
+    // Include the error message if it's available and helpful
+    const sanitizedMessage = err.message
+      .replace(/token=\w+/g, 'token=***') // Hide tokens in error messages
+      .substring(0, 100); // Limit length for security
+    
+    if (!sanitizedMessage.includes('sensitive') && !sanitizedMessage.includes('password')) {
+      errorMessage += ` Details: ${sanitizedMessage}`;
+    }
+  }
+  
+  ctx.reply(
+    `❌ ${errorMessage}\n\n` +
+    `Please try again later or contact support at https://t.me/copperxcommunity/2183`
+  ).catch((replyErr) => {
+    // Log if we can't even send the error message
+    console.error('Failed to send error message to user:', replyErr);
+  });
 });
 
 // Start the bot
