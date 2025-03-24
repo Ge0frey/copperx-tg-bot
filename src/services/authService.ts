@@ -115,7 +115,52 @@ export const authenticateWithOtp = async (email: string, otp: string, userId: st
     console.log('Authentication payload:', JSON.stringify(data));
     const response = await post<any>('/auth/email-otp/authenticate', data);
     
-    // Enhanced response handling
+    // Log the full response for debugging
+    console.log('Authentication raw response:', JSON.stringify(response, null, 2));
+    
+    // Check if response is directly an error message or error object
+    if (response.error) {
+      return {
+        status: false,
+        message: typeof response.error === 'string' ? response.error : 'Authentication failed',
+        error: response.error
+      };
+    }
+    
+    // Handle the case where the API returns a simple success response
+    if (response.success === true || response.status === true) {
+      // If there's no tokens info, but we have a success status, create a minimal response
+      if (!response.data?.tokens && !response.tokens) {
+        console.log('Success response without tokens, constructing minimal response');
+        
+        // Check if user exists in various places in the response
+        const user = response.data?.user || response.user || { email, id: '', organizationId: '' };
+        
+        // Construct a basic response that meets our AuthResponse structure
+        const constructedResponse = {
+          tokens: {
+            access: {
+              token: response.token || response.accessToken || '',
+              expires: new Date(Date.now() + 3600000).toISOString() // Default 1 hour
+            }
+          },
+          user: user
+        };
+        
+        // If we found a token, store it and return success
+        if (constructedResponse.tokens.access.token) {
+          setTokenForUser(userId, constructedResponse.tokens.access.token);
+          
+          return {
+            status: true,
+            message: 'Authentication successful',
+            data: constructedResponse
+          };
+        }
+      }
+    }
+    
+    // Enhanced response handling for standard format
     if (
       (response.status === true || response.success === true) && 
       response.data?.tokens?.access?.token
@@ -163,12 +208,62 @@ export const authenticateWithOtp = async (email: string, otp: string, userId: st
           user: response.user || { email, organizationId: '', id: '' }
         }
       };
+    } else if (response.token || response.accessToken) {
+      // Handle the simplest case where API just returns a token directly
+      const token = response.token || response.accessToken;
+      setTokenForUser(userId, token);
+      
+      // Construct a proper response object
+      return {
+        status: true,
+        message: 'Authentication successful',
+        data: {
+          tokens: {
+            access: {
+              token: token,
+              expires: new Date(Date.now() + 3600000).toISOString() // Default 1 hour
+            }
+          },
+          user: response.user || { email, organizationId: '', id: '' }
+        }
+      };
     } else if (response.status === false) {
       // API explicitly returned failure
       return response;
     } else {
-      // Could not determine if successful, log for debugging
-      console.error('Unexpected authentication response format:', response);
+      // Try to extract any useful information from the response
+      console.error('Unexpected authentication response format:', JSON.stringify(response, null, 2));
+      
+      // Check if we can find a token in any location
+      const possibleToken = 
+        response.data?.token || 
+        response.data?.access?.token || 
+        response.accessToken || 
+        response.data?.accessToken ||
+        (response.data?.data && response.data.data.token);
+      
+      if (possibleToken) {
+        console.log('Found token in unexpected location:', possibleToken);
+        setTokenForUser(userId, possibleToken);
+        
+        // Try to extract user info
+        const userInfo = response.user || response.data?.user || { email, organizationId: '', id: '' };
+        
+        return {
+          status: true,
+          message: 'Authentication successful',
+          data: {
+            tokens: {
+              access: {
+                token: possibleToken,
+                expires: new Date(Date.now() + 3600000).toISOString() // Default 1 hour
+              }
+            },
+            user: userInfo
+          }
+        };
+      }
+      
       return {
         status: false,
         message: 'Authentication failed: Unexpected response format',

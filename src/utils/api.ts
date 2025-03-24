@@ -148,6 +148,8 @@ export const apiRequest = async <T>(
     console.log(`API Response: ${method} ${url}`, {
       status: response.status,
       statusText: response.statusText,
+      // Log more details for debugging unexpected response formats
+      data: typeof response.data === 'object' ? JSON.stringify(response.data) : response.data,
       // Only log the structure of the response data, not the full content for large responses
       dataStructure: response.data ? Object.keys(response.data as any) : null
     });
