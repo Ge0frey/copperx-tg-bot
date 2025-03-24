@@ -208,7 +208,42 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
       { parse_mode: 'Markdown' }
     );
   } else {
-    const errorMsg = authResponse.message || 'Invalid code';
+    // More robust error message extraction
+    let errorMsg = 'Invalid code';
+    if (authResponse.message) {
+      if (typeof authResponse.message === 'string') {
+        errorMsg = authResponse.message;
+      } else if (typeof authResponse.message === 'object' && authResponse.message !== null) {
+        // Try to extract a message from the error object
+        const messageObj = authResponse.message as any;
+        if (messageObj.message) {
+          errorMsg = messageObj.message;
+        } else {
+          // Try to stringify the object for debugging
+          try {
+            errorMsg = JSON.stringify(authResponse.message);
+          } catch (e) {
+            errorMsg = 'Authentication failed';
+          }
+        }
+      }
+    } else if (authResponse.error) {
+      // Try to extract message from error field
+      if (typeof authResponse.error === 'string') {
+        errorMsg = authResponse.error;
+      } else if (typeof authResponse.error === 'object' && authResponse.error !== null) {
+        const errorObj = authResponse.error as any;
+        if (errorObj.message) {
+          errorMsg = errorObj.message;
+        } else {
+          try {
+            errorMsg = JSON.stringify(authResponse.error);
+          } catch (e) {
+            errorMsg = 'Authentication failed';
+          }
+        }
+      }
+    }
     
     // Give more helpful guidance based on the error
     let helpText = '';
@@ -222,6 +257,9 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
         helpText = 'Too many attempts. Please try again later with /login.';
       }
     }
+    
+    // Log the full error for debugging
+    console.error('OTP Authentication error:', JSON.stringify(authResponse, null, 2));
     
     await ctx.reply(
       `❌ Verification failed: ${errorMsg}\n\n` +

@@ -47,9 +47,35 @@ export const requestEmailOtp = async (email: string): Promise<ApiResponse<any>> 
   } catch (error: unknown) {
     const apiError = error as ApiError;
     console.error('Error requesting email OTP:', apiError.response?.data || apiError.message);
+    
+    // Enhanced error message extraction
+    let errorMessage = 'Failed to request OTP. Please try again.';
+    
+    if (apiError.response?.data?.message) {
+      // Ensure data.message is a string
+      if (typeof apiError.response.data.message === 'string') {
+        errorMessage = apiError.response.data.message;
+      } else if (typeof apiError.response.data.message === 'object') {
+        try {
+          errorMessage = JSON.stringify(apiError.response.data.message);
+        } catch (e) {
+          // Keep default message if stringify fails
+        }
+      }
+    } else if (apiError.message && typeof apiError.message === 'string') {
+      errorMessage = apiError.message;
+    }
+    
+    // Log full error for debugging
+    console.error('OTP request error details:', JSON.stringify({
+      status: apiError.response?.status,
+      data: apiError.response?.data,
+      message: apiError.message
+    }, null, 2));
+    
     return {
       status: false,
-      message: apiError.response?.data?.message || 'Failed to request OTP. Please try again.',
+      message: errorMessage,
       error: apiError.response?.data || apiError,
     };
   }
@@ -132,8 +158,24 @@ export const authenticateWithOtp = async (email: string, otp: string, userId: st
     } else if (apiError.response?.status === 429) {
       errorMessage = 'Too many attempts. Please wait before trying again.';
     } else if (apiError.response?.data?.message) {
-      errorMessage = apiError.response.data.message;
+      // Ensure data.message is a string
+      if (typeof apiError.response.data.message === 'string') {
+        errorMessage = apiError.response.data.message;
+      } else if (typeof apiError.response.data.message === 'object') {
+        try {
+          errorMessage = JSON.stringify(apiError.response.data.message);
+        } catch (e) {
+          errorMessage = 'Invalid authentication response';
+        }
+      }
     }
+    
+    // Log full error for debugging
+    console.error('Authentication error details:', JSON.stringify({
+      status: apiError.response?.status,
+      data: apiError.response?.data,
+      message: apiError.message
+    }, null, 2));
     
     return {
       status: false,
