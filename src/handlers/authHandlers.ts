@@ -91,11 +91,6 @@ export const handleEmailInput = async (ctx: Context): Promise<void> => {
     // Store email in session
     setTempData(chatId, 'email', email);
     
-    // Store sessionId if available in the response
-    if (response.data && response.data.sessionId) {
-      setTempData(chatId, 'sessionId', response.data.sessionId);
-    }
-    
     // Update state to wait for OTP
     updateState(chatId, BotState.AUTH_OTP);
     
@@ -134,8 +129,6 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
   
   // Get email from session
   const email = getTempData(chatId, 'email');
-  // Get sessionId from session
-  const sessionId = getTempData(chatId, 'sessionId');
   
   if (!email) {
     await ctx.reply(
@@ -155,8 +148,8 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
   // Show loading indicator
   const loadingMessage = await ctx.reply(`Verifying code...`);
   
-  // Authenticate with OTP
-  const authResponse = await authenticateWithOtp(email, otp, chatId, sessionId);
+  // Authenticate with OTP - no session ID
+  const authResponse = await authenticateWithOtp(email, otp, chatId);
   
   // Clean up loading message
   if (ctx.chat) {

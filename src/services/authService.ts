@@ -26,12 +26,11 @@ export const requestEmailOtp = async (email: string): Promise<ApiResponse<any>> 
       // If the API simply returns a message without status
       (response.message && !response.error)
     ) {
-      // Log the response to see what fields it contains
       console.log('OTP request success response:', JSON.stringify(response));
       return {
         status: true,
         message: response.message || 'Verification code sent successfully',
-        data: response.data || { sessionId: response.sessionId } // Extract sessionId from different locations
+        data: response.data
       };
     } else if (response.status === false) {
       // The API explicitly returned status: false
@@ -43,7 +42,7 @@ export const requestEmailOtp = async (email: string): Promise<ApiResponse<any>> 
       return {
         status: true,
         message: 'Verification code sent',
-        data: response.data || { sessionId: response.sessionId } || response // Try to include sessionId
+        data: response.data || response
       };
     }
   } catch (error: unknown) {
@@ -85,11 +84,9 @@ export const requestEmailOtp = async (email: string): Promise<ApiResponse<any>> 
 
 export const authenticateWithOtp = async (email: string, otp: string, userId: string, sessionId?: string): Promise<ApiResponse<AuthResponse>> => {
   try {
-    // Include sessionId in the request payload if provided
-    const data: EmailOtpAuthentication = sessionId 
-      ? { email, otp, sessionId }
-      : { email, otp };
-      
+    // Simplify payload to just include email and OTP
+    const data: EmailOtpAuthentication = { email, otp };
+    
     console.log('Authentication payload:', JSON.stringify(data));
     const response = await post<any>('/auth/email-otp/authenticate', data);
     
