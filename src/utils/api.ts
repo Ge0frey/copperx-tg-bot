@@ -127,6 +127,20 @@ export const apiRequest = async <T>(
   config?: AxiosRequestConfig
 ): Promise<T> => {
   try {
+    // Special log for profile requests
+    if (url === '/auth/me') {
+      console.log(`[API] Making profile request for user ${userId}`);
+      
+      // Check if we have a valid token
+      const token = getTokenForUser(userId);
+      if (!token) {
+        console.error(`[API] No token available for user ${userId} when fetching profile`);
+      } else {
+        // Log token length for debugging (don't log the actual token)
+        console.log(`[API] Token available for user ${userId}, length: ${token.length}`);
+      }
+    }
+  
     const requestConfig: AxiosRequestConfig = {
       ...config,
       method,
@@ -157,6 +171,15 @@ export const apiRequest = async <T>(
       }
     });
 
+    // For profile requests, log the full configuration (but mask the token)
+    if (url === '/auth/me') {
+      const debugConfig = { ...requestConfig };
+      if (debugConfig.headers?.Authorization) {
+        debugConfig.headers.Authorization = 'Bearer ********';
+      }
+      console.log(`[API] Profile request config:`, JSON.stringify(debugConfig, null, 2));
+    }
+
     const response: AxiosResponse<T> = await apiClient(requestConfig);
     
     // Log successful response status but not the entire data payload
@@ -169,7 +192,9 @@ export const apiRequest = async <T>(
     
     // For auth/me endpoint, log more details for debugging
     if (url === '/auth/me') {
-      console.log(`[API] Profile response structure: ${JSON.stringify(response.data, null, 2)}`);
+      console.log(`[API] Profile response structure:`, JSON.stringify(response.data, null, 2));
+      // Log response headers as well
+      console.log(`[API] Profile response headers:`, JSON.stringify(response.headers, null, 2));
     }
     
     return response.data;

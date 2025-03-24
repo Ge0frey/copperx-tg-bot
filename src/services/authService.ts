@@ -324,27 +324,47 @@ export const getUserProfile = async (userId: string): Promise<ApiResponse<User>>
       };
     }
     
-    const response = await get<any>('/auth/me', {}, userId);
-    console.log(`[Profile] Profile API response:`, JSON.stringify(response, null, 2));
-    
-    // Check if the response contains user data
-    if (response && (response.data || response.user)) {
-      // Normalize the response to ensure it matches our expected format
-      const userData = response.data || response.user || response;
+    // Try with different endpoint paths commonly used for profile
+    try {
+      console.log('[Profile] Attempting to fetch profile with /auth/me endpoint');
+      const response = await get<any>('/auth/me', {}, userId);
       
-      return {
-        status: true,
-        message: 'Profile fetched successfully',
-        data: userData
-      };
-    } else {
-      // Handle case where the response doesn't contain expected data shape
-      console.error(`[Profile] Unexpected response format:`, JSON.stringify(response, null, 2));
-      return {
-        status: false,
-        message: 'The server returned an unexpected response format',
-        error: response
-      };
+      // Debug log the complete response
+      console.log(`[Profile] Raw API response from /auth/me:`, JSON.stringify(response, null, 2));
+      
+      // Process the response (rest of the code remains the same)
+      return processProfileResponse(response, userId);
+    } catch (error) {
+      console.log('[Profile] Error with /auth/me endpoint, trying /users/me', error);
+      
+      try {
+        // Some APIs use /users/me instead
+        const response = await get<any>('/users/me', {}, userId);
+        console.log(`[Profile] Raw API response from /users/me:`, JSON.stringify(response, null, 2));
+        return processProfileResponse(response, userId);
+      } catch (usersError) {
+        console.log('[Profile] Error with /users/me endpoint, trying /user/profile', usersError);
+        
+        try {
+          // Another common endpoint
+          const response = await get<any>('/user/profile', {}, userId);
+          console.log(`[Profile] Raw API response from /user/profile:`, JSON.stringify(response, null, 2));
+          return processProfileResponse(response, userId);
+        } catch (profileError) {
+          console.log('[Profile] Error with /user/profile endpoint, trying /me', profileError);
+          
+          try {
+            // Simple /me endpoint
+            const response = await get<any>('/me', {}, userId);
+            console.log(`[Profile] Raw API response from /me:`, JSON.stringify(response, null, 2));
+            return processProfileResponse(response, userId);
+          } catch (meError) {
+            // If all attempts fail, throw the original error
+            console.error('[Profile] All profile endpoint attempts failed');
+            throw error;
+          }
+        }
+      }
     }
   } catch (error: unknown) {
     const apiError = error as ApiError;
@@ -391,6 +411,200 @@ export const getUserProfile = async (userId: string): Promise<ApiResponse<User>>
     };
   }
 };
+
+// Helper function to process profile response data
+function processProfileResponse(response: any, userId: string): ApiResponse<User> {
+  // Try to extract user data from the response
+  // The Copperx API might return the user data in different formats
+  
+  let userData = null;
+  
+  // Case 1: Check if response itself is the user data
+  if (response && response.email && (response.id || response._id)) {
+    console.log('[Profile] Found user data directly in response');
+    userData = response;
+  } 
+  // Case 2: Check if data property contains user data
+  else if (response?.data && response.data.email && (response.data.id || response.data._id)) {
+    console.log('[Profile] Found user data in response.data');
+    userData = response.data;
+  }
+  // Case 3: Check if user property contains user data
+  else if (response?.user && response.user.email && (response.user.id || response.user._id)) {
+    console.log('[Profile] Found user data in response.user');
+    userData = response.user;
+  }
+  // Case 4: Check if it's in a data.user nested structure
+  else if (response?.data?.user && response.data.user.email && (response.data.user.id || response.data.user._id)) {
+    console.log('[Profile] Found user data in response.data.user');
+    userData = response.data.user;
+  }
+  // Case 5: Response might have { data: { data: { user data } } } structure
+  else if (response?.data?.data && response.data.data.email && (response.data.data.id || response.data.data._id)) {
+    console.log('[Profile] Found user data in response.data.data');
+    userData = response.data.data;
+  }
+  
+  // Log extracted user data for debugging
+  if (userData) {
+    console.log('[Profile] Extracted user data:', {
+      id: userData.id || userData._id,
+      email: userData.email,
+      name: userData.name || 'Not available',
+      organizationId: userData.organizationId || userData.organization || userData.organizationID
+    });
+    
+    // Normalize the user data to ensure it has expected fields
+    // Convert various id/organization fields to standard format
+    const normalizedUser = {
+      id: userData.id || userData._id || '',
+      email: userData.email || '',
+      name: userData.name || '',
+      role: userData.role || userData.userType || 'User',
+      isEmailVerified: userData.isEmailVerified || userData.emailVerified || true,
+      organizationId: userData.organizationId || userData.organization || userData.organizationID || ''
+    };
+    
+    return {
+      status: true,
+      message: 'Profile fetched successfully',
+      data: normalizedUser
+    };
+  }
+  
+  // If we couldn't extract user data in a way we understand, log this unexpected format
+  console.error(`[Profile] Unable to extract user data from API response:`, JSON.stringify(response, null, 2));
+  
+  // As a last resort, try to create a user object from whatever we can find
+  const fallbackUser = extractFallbackUserData(response);
+  if (fallbackUser && fallbackUser.email) {
+    console.log('[Profile] Using fallback user data extraction');
+    return {
+      status: true,
+      message: 'Profile fetched with limited information',
+      data: fallbackUser
+    };
+  }
+  
+  return {
+    status: false,
+    message: 'The server returned an unexpected response format',
+    error: response
+  };
+}
+
+// Helper function to try extract user data from any response structure
+function extractFallbackUserData(response: any): User | null {
+  try {
+    console.log('[Profile] Starting fallback data extraction');
+    
+    // Try to extract directly from common patterns first
+    if (typeof response === 'object') {
+      // Check for common patterns at top level
+      // Pattern: { data: { user properties } }
+      if (response.data && typeof response.data === 'object' && response.data.email) {
+        console.log('[Profile] Found user data in response.data');
+        return createUserFromObject(response.data);
+      }
+      
+      // Pattern: { user: { user properties } }
+      if (response.user && typeof response.user === 'object' && response.user.email) {
+        console.log('[Profile] Found user data in response.user');
+        return createUserFromObject(response.user);
+      }
+      
+      // Pattern: { data: { user: { user properties } } }
+      if (response.data?.user && typeof response.data.user === 'object' && response.data.user.email) {
+        console.log('[Profile] Found user data in response.data.user');
+        return createUserFromObject(response.data.user);
+      }
+      
+      // Pattern: { result: { user properties } }
+      if (response.result && typeof response.result === 'object' && response.result.email) {
+        console.log('[Profile] Found user data in response.result');
+        return createUserFromObject(response.result);
+      }
+      
+      // Direct check if response has email (might be the user object itself)
+      if (response.email) {
+        console.log('[Profile] Response itself appears to be user data');
+        return createUserFromObject(response);
+      }
+    }
+    
+    // If we haven't found data in common patterns, search recursively
+    console.log('[Profile] Using recursive search for user data');
+    
+    // Search recursively through the response for likely email and id fields
+    const email = findValueByKey(response, 'email');
+    if (!email) {
+      console.log('[Profile] No email found in response, cannot create user data');
+      return null;
+    }
+    
+    const id = findValueByKey(response, 'id') || 
+               findValueByKey(response, '_id') || 
+               findValueByKey(response, 'userId');
+               
+    const name = findValueByKey(response, 'name') || 
+                findValueByKey(response, 'userName') || 
+                findValueByKey(response, 'fullName');
+                
+    const organizationId = findValueByKey(response, 'organizationId') || 
+                          findValueByKey(response, 'organization') || 
+                          findValueByKey(response, 'organizationID') ||
+                          findValueByKey(response, 'orgId');
+                          
+    const role = findValueByKey(response, 'role') || 
+                findValueByKey(response, 'userType') ||
+                findValueByKey(response, 'userRole');
+    
+    console.log('[Profile] Extracted fields via recursive search:', {
+      email, id, name, organizationId, role
+    });
+    
+    // Create a user object from the found fields
+    return {
+      id: id || '',
+      email: email,
+      name: name || '',
+      role: role || 'User',
+      isEmailVerified: true,
+      organizationId: organizationId || ''
+    };
+  } catch (e) {
+    console.error('[Profile] Error in fallback user data extraction:', e);
+    return null;
+  }
+}
+
+// Helper function to create a standardized user object from any object with user-like properties
+function createUserFromObject(obj: any): User {
+  return {
+    id: obj.id || obj._id || obj.userId || '',
+    email: obj.email || '',
+    name: obj.name || obj.userName || obj.fullName || '',
+    role: obj.role || obj.userType || obj.userRole || 'User',
+    isEmailVerified: obj.isEmailVerified || obj.emailVerified || true,
+    organizationId: obj.organizationId || obj.organization || obj.organizationID || obj.orgId || ''
+  };
+}
+
+// Helper function to search deeply through an object for a specific key
+function findValueByKey(obj: any, key: string): any {
+  if (!obj || typeof obj !== 'object') return undefined;
+  
+  if (obj[key] !== undefined) return obj[key];
+  
+  for (const k in obj) {
+    if (typeof obj[k] === 'object') {
+      const value = findValueByKey(obj[k], key);
+      if (value !== undefined) return value;
+    }
+  }
+  
+  return undefined;
+}
 
 export const getKycStatus = async (userId: string): Promise<ApiResponse<Kyc[]>> => {
   try {

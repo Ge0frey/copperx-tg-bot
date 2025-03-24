@@ -332,12 +332,18 @@ export const handleProfile = async (ctx: Context): Promise<void> => {
     return;
   }
   
+  console.log('[Handler] Profile request for chat ID:', chatId);
+  console.log('[Handler] Session data:', JSON.stringify(session, null, 2));
+  
   // Show loading indicator
   const loadingMessage = await ctx.reply(`Fetching your profile...`);
   
   try {
     // Get user profile from API
     const response = await getUserProfile(chatId);
+    
+    // Log the full response for debugging
+    console.log('[Handler] Profile response:', JSON.stringify(response, null, 2));
     
     // Clean up loading message
     if (ctx.chat) {
@@ -346,6 +352,13 @@ export const handleProfile = async (ctx: Context): Promise<void> => {
     
     if (response.status && response.data) {
       const userData = response.data;
+      
+      // Add key existence checks for debugging
+      console.log('[Handler] User data keys:', Object.keys(userData));
+      console.log('[Handler] Email exists:', !!userData.email);
+      console.log('[Handler] Name exists:', !!userData.name);
+      console.log('[Handler] OrganizationId exists:', !!userData.organizationId);
+      console.log('[Handler] Role exists:', !!userData.role);
       
       // Fetch KYC status
       const kycResponse = await getKycStatus(chatId);
@@ -357,13 +370,17 @@ export const handleProfile = async (ctx: Context): Promise<void> => {
         kycStatus = approvedKyc ? 'Approved ✅' : 'Not approved ❌';
       }
       
+      const profileMessage = `👤 *User Profile*\n\n` +
+      `Email: ${userData.email || 'Not available'}\n` +
+      `Name: ${userData.name || 'Not set'}\n` +
+      `KYC Status: ${kycStatus}\n` +
+      `Organization ID: ${userData.organizationId || 'Not available'}\n` +
+      `Account Type: ${userData.role || 'User'}`;
+      
+      console.log('[Handler] Sending profile message:', profileMessage);
+      
       await ctx.reply(
-        `👤 *User Profile*\n\n` +
-        `Email: ${userData.email || 'Not available'}\n` +
-        `Name: ${userData.name || 'Not set'}\n` +
-        `KYC Status: ${kycStatus}\n` +
-        `Organization ID: ${userData.organizationId || 'Not available'}\n` +
-        `Account Type: ${userData.role || 'User'}`,
+        profileMessage,
         { parse_mode: 'Markdown' }
       );
     } else {
@@ -377,6 +394,8 @@ export const handleProfile = async (ctx: Context): Promise<void> => {
         actionMessage = 'This may be a temporary issue. Please try again in a few minutes.';
       }
       
+      console.log('[Handler] Error fetching profile:', errorMessage);
+      
       await ctx.reply(
         `❌ Failed to fetch profile: ${errorMessage}\n\n` +
         `${actionMessage}\n\n` +
@@ -389,7 +408,7 @@ export const handleProfile = async (ctx: Context): Promise<void> => {
       await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
     }
     
-    console.error('Unexpected error in handleProfile:', error);
+    console.error('[Handler] Unexpected error in handleProfile:', error);
     
     await ctx.reply(
       `❌ An unexpected error occurred while fetching your profile.\n\n` +
