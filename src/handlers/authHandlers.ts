@@ -212,16 +212,44 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
     let errorMsg = 'Invalid code';
     if (authResponse.message) {
       if (typeof authResponse.message === 'string') {
-        errorMsg = authResponse.message;
+        // Check if the message is a JSON array string (likely validation errors)
+        if (authResponse.message.startsWith('[') && authResponse.message.endsWith(']')) {
+          try {
+            const validationErrors = JSON.parse(authResponse.message);
+            if (Array.isArray(validationErrors) && validationErrors.length > 0) {
+              // Format validation errors in a user-friendly way
+              errorMsg = formatValidationErrors(validationErrors);
+            }
+          } catch (e) {
+            // If parsing fails, use the original message
+            errorMsg = authResponse.message;
+          }
+        } else {
+          errorMsg = authResponse.message;
+        }
       } else if (typeof authResponse.message === 'object' && authResponse.message !== null) {
         // Try to extract a message from the error object
         const messageObj = authResponse.message as any;
         if (messageObj.message) {
           errorMsg = messageObj.message;
+        } else if (Array.isArray(messageObj) && messageObj.length > 0) {
+          // Handle array of validation errors
+          errorMsg = formatValidationErrors(messageObj);
         } else {
           // Try to stringify the object for debugging
           try {
-            errorMsg = JSON.stringify(authResponse.message);
+            const stringified = JSON.stringify(authResponse.message);
+            // Check if it's a validation error array
+            if (stringified.startsWith('[{') && stringified.includes('constraints')) {
+              try {
+                const validationErrors = JSON.parse(stringified);
+                errorMsg = formatValidationErrors(validationErrors);
+              } catch {
+                errorMsg = stringified;
+              }
+            } else {
+              errorMsg = stringified;
+            }
           } catch (e) {
             errorMsg = 'Authentication failed';
           }
@@ -235,9 +263,23 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
         const errorObj = authResponse.error as any;
         if (errorObj.message) {
           errorMsg = errorObj.message;
+        } else if (Array.isArray(errorObj) && errorObj.length > 0) {
+          // Handle array of validation errors
+          errorMsg = formatValidationErrors(errorObj);
         } else {
           try {
-            errorMsg = JSON.stringify(authResponse.error);
+            const stringified = JSON.stringify(authResponse.error);
+            // Check if it's a validation error array
+            if (stringified.startsWith('[{') && stringified.includes('constraints')) {
+              try {
+                const validationErrors = JSON.parse(stringified);
+                errorMsg = formatValidationErrors(validationErrors);
+              } catch {
+                errorMsg = stringified;
+              }
+            } else {
+              errorMsg = stringified;
+            }
           } catch (e) {
             errorMsg = 'Authentication failed';
           }
@@ -312,4 +354,62 @@ export const handleProfile = async (ctx: Context): Promise<void> => {
       `Please try again or contact support.`
     );
   }
-}; 
+};
+
+// Helper function to format validation errors
+function formatValidationErrors(errors: any[]): string {
+  if (!Array.isArray(errors) || errors.length === 0) {
+    return 'Validation failed';
+  }
+  
+  const formattedErrors: string[] = [];
+  
+  for (const error of errors) {
+    if (error.property) {
+      const propertyName = formatPropertyName(error.property);
+      
+      if (error.constraints) {
+        const constraints = Object.keys(error.constraints);
+        if (constraints.length > 0) {
+          if (constraints.includes('isNotEmpty') || constraints.includes('required')) {
+            formattedErrors.push(`${propertyName} is required`);
+          } else if (constraints.includes('isString')) {
+            formattedErrors.push(`${propertyName} must be text`);
+          } else if (constraints.includes('isNumber') || constraints.includes('isInt')) {
+            formattedErrors.push(`${propertyName} must be a number`);
+          } else if (constraints.includes('isEmail')) {
+            formattedErrors.push(`${propertyName} must be a valid email address`);
+          } else {
+            formattedErrors.push(`${propertyName} is invalid`);
+          }
+        } else {
+          formattedErrors.push(`${propertyName} is invalid`);
+        }
+      } else {
+        formattedErrors.push(`${propertyName} is invalid`);
+      }
+    }
+  }
+  
+  return formattedErrors.length > 0
+    ? `Validation failed: ${formattedErrors.join(', ')}`
+    : 'Validation failed';
+}
+
+// Helper function to format property names (e.g., convert camelCase to Title Case)
+function formatPropertyName(property: string): string {
+  // Special case for common acronyms
+  if (property.toLowerCase() === 'sid') return 'Session ID';
+  if (property.toLowerCase() === 'otp') return 'Verification code';
+  if (property.toLowerCase() === 'id') return 'ID';
+  
+  // Convert camelCase or snake_case to Title Case with spaces
+  return property
+    // Insert a space before uppercase letters
+    .replace(/([A-Z])/g, ' $1')
+    // Replace underscores with spaces
+    .replace(/_/g, ' ')
+    // Capitalize first letter and trim
+    .replace(/^./, str => str.toUpperCase())
+    .trim();
+} 
