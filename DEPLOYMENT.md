@@ -95,7 +95,7 @@ This will compile the TypeScript code to JavaScript in the `dist` directory.
 
 For production deployments, set up a webhook:
 
-1. Set the `BOT_WEBHOOK_URL` environment variable to point to your deployment URL + "/webhook"
+1. Set the `WEBHOOK_DOMAIN` environment variable to point to your deployment URL + "/webhook"
    e.g., `https://your-app.onrender.com/webhook`
 
 2. Make sure your server is accessible via HTTPS (required by Telegram)
