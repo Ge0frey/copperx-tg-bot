@@ -144,12 +144,13 @@ const startBot = async () => {
       const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN;
       
       if (WEBHOOK_DOMAIN) {
-        // Set webhook
-        await bot.telegram.setWebhook(`${WEBHOOK_DOMAIN}/bot${config.botToken}`);
+        // Set webhook with correct path that ends with '/webhook'
+        const webhookPath = '/webhook';
+        await bot.telegram.setWebhook(`${WEBHOOK_DOMAIN}${webhookPath}`);
         
-        // Start webhook
+        // Start webhook with the correct path
         // @ts-ignore
-        bot.startWebhook(`/bot${config.botToken}`, null, PORT);
+        bot.startWebhook(webhookPath, null, PORT);
         
         console.log(`Bot is running in webhook mode on port ${PORT}`);
       } else {

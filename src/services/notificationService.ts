@@ -62,7 +62,7 @@ export const initializePusherClient = async (
       console.error('Subscription error:', error);
     });
 
-    // Bind to deposit event
+    // Bind to deposit event on the channel (not on the pusher client)
     channel.bind('deposit', (data: any) => {
       console.log('Deposit received:', data);
       

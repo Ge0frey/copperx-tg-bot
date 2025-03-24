@@ -1,4 +1,4 @@
-import { post, get, setTokenForUser, clearTokenForUser } from '../utils/api';
+import { post, get, setTokenForUser, clearTokenForUser, setRefreshTokenForUser, setTokenExpiryForUser } from '../utils/api';
 import { ApiResponse, AuthResponse, EmailOtpAuthentication, EmailOtpRequest, User, Kyc } from '../models/types';
 
 export const requestEmailOtp = async (email: string): Promise<ApiResponse<any>> => {
@@ -21,8 +21,19 @@ export const authenticateWithOtp = async (email: string, otp: string, userId: st
     const response = await post<ApiResponse<AuthResponse>>('/auth/email-otp/authenticate', data);
     
     if (response.status && response.data?.tokens.access.token) {
-      // Store the token associated with this user's ID
+      // Store the access token associated with this user's ID
       setTokenForUser(userId, response.data.tokens.access.token);
+      
+      // Store refresh token if available
+      if (response.data.tokens.refresh?.token) {
+        setRefreshTokenForUser(userId, response.data.tokens.refresh.token);
+      }
+      
+      // Store token expiry time
+      if (response.data.tokens.access.expires) {
+        const expiryTimestamp = new Date(response.data.tokens.access.expires).getTime();
+        setTokenExpiryForUser(userId, expiryTimestamp);
+      }
     }
     
     return response;
