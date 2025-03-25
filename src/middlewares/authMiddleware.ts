@@ -12,8 +12,15 @@ export const requireAuth: Middleware<Context> = async (ctx, next) => {
   
   if (!isAuthenticated(chatId)) {
     // User is not authenticated
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '🔑 Login Now', callback_data: 'menu:login' }]
+      ]
+    };
+    
     await ctx.reply(
-      '🔐 You need to log in first.\n\nPlease use /login to authenticate with your Copperx account.'
+      '🔐 You need to log in first to access this feature.',
+      { reply_markup: keyboard }
     );
     return;
   }

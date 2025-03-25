@@ -114,7 +114,7 @@ bot.on('callback_query', async (ctx) => {
     await handleSupportCallback(ctx);
   } else if (callbackData === 'start:menu') {
     await ctx.answerCbQuery();
-    await ctx.reply('/menu');
+    await handleMenu(ctx);
   }
 });
 

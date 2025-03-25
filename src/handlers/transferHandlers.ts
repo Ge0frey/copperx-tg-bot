@@ -19,6 +19,7 @@ import {
   getTempData, 
   clearTempData 
 } from '../utils/sessionManager';
+import { handleMenu } from './menuHandlers';
 
 // Handler for /transfers command to view history
 export const handleTransferHistory = async (ctx: Context): Promise<void> => {
@@ -106,6 +107,13 @@ export const handleTransferTypeCallback = async (ctx: Context): Promise<void> =>
   const chatId = ctx.chat?.id.toString() || '';
   const callbackData = ctx.callbackQuery.data;
   
+  // Check if it's a menu callback
+  if (callbackData === 'menu:menu') {
+    await ctx.answerCbQuery();
+    await handleMenu(ctx);
+    return;
+  }
+  
   // Extract transfer type from callback data
   const match = callbackData.match(/transfer:(.+)/);
   if (!match) return;
@@ -148,9 +156,11 @@ export const handleTransferTypeCallback = async (ctx: Context): Promise<void> =>
       
     case 'cancel':
       await ctx.editMessageText(
-        `✅ Transfer cancelled. Use /menu to see other options.`
+        `✅ Transfer cancelled. Returning to main menu.`
       );
       updateState(chatId, BotState.MAIN_MENU);
+      clearTempData(chatId);
+      await handleMenu(ctx);
       break;
       
     default:
@@ -441,8 +451,9 @@ const confirmEmailTransfer = async (ctx: Context, chatId: string): Promise<void>
   const network = getTempData(chatId, 'transferNetwork');
   
   if (!email || !amount || !network) {
-    await ctx.reply(`❌ Missing transfer details. Please start again with /send.`);
+    await ctx.reply(`❌ Missing transfer details. Returning to transfer options.`);
     updateState(chatId, BotState.MAIN_MENU);
+    await handleSendCommand(ctx);
     return;
   }
   
@@ -475,8 +486,9 @@ const confirmWalletTransfer = async (ctx: Context, chatId: string): Promise<void
   const network = getTempData(chatId, 'transferNetwork');
   
   if (!walletAddress || !amount || !network) {
-    await ctx.reply(`❌ Missing transfer details. Please start again with /send.`);
+    await ctx.editMessageText(`❌ Missing transfer details. Returning to transfer options.`);
     updateState(chatId, BotState.MAIN_MENU);
+    await handleSendCommand(ctx);
     return;
   }
   
@@ -563,10 +575,11 @@ export const handleTransferConfirmation = async (ctx: Context): Promise<void> =>
       
     case 'cancel_transfer':
       await ctx.editMessageText(
-        `✅ Transfer cancelled. Use /menu to see other options.`
+        `✅ Transfer cancelled. Returning to main menu.`
       );
       updateState(chatId, BotState.MAIN_MENU);
       clearTempData(chatId);
+      await handleMenu(ctx);
       break;
       
     default:
@@ -584,8 +597,9 @@ const executeEmailTransfer = async (ctx: Context, chatId: string): Promise<void>
   const network = getTempData(chatId, 'transferNetwork');
   
   if (!email || !amount || !network) {
-    await ctx.editMessageText(`❌ Missing transfer details. Please start again with /send.`);
+    await ctx.editMessageText(`❌ Missing transfer details. Returning to transfer options.`);
     updateState(chatId, BotState.MAIN_MENU);
+    await handleSendCommand(ctx);
     return;
   }
   
@@ -630,8 +644,9 @@ const executeWalletTransfer = async (ctx: Context, chatId: string): Promise<void
   const network = getTempData(chatId, 'transferNetwork');
   
   if (!walletAddress || !amount || !network) {
-    await ctx.editMessageText(`❌ Missing transfer details. Please start again with /send.`);
+    await ctx.editMessageText(`❌ Missing transfer details. Returning to transfer options.`);
     updateState(chatId, BotState.MAIN_MENU);
+    await handleSendCommand(ctx);
     return;
   }
   
@@ -677,8 +692,9 @@ const executeBankTransfer = async (ctx: Context, chatId: string): Promise<void> 
   const amount = getTempData(chatId, 'transferAmount');
   
   if (!name || !accountNumber || !routingNumber || !bankName || !amount) {
-    await ctx.editMessageText(`❌ Missing transfer details. Please start again with /send.`);
+    await ctx.editMessageText(`❌ Missing transfer details. Returning to transfer options.`);
     updateState(chatId, BotState.MAIN_MENU);
+    await handleSendCommand(ctx);
     return;
   }
   
@@ -715,4 +731,4 @@ const executeBankTransfer = async (ctx: Context, chatId: string): Promise<void> 
   // Reset state
   updateState(chatId, BotState.MAIN_MENU);
   clearTempData(chatId);
-}; 
+};

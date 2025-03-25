@@ -1,5 +1,8 @@
 import { Context } from 'telegraf';
 import { isAuthenticated } from '../utils/sessionManager';
+import { handleProfile, handleLogin, handleLogout } from '../handlers/authHandlers';
+import { handleBalance, handleWallets, handleDeposit, handleSetDefaultWallet } from '../handlers/walletHandlers';
+import { handleSendCommand, handleTransferHistory } from '../handlers/transferHandlers';
 
 // Handler for /menu command
 export const handleMenu = async (ctx: Context): Promise<void> => {
@@ -72,68 +75,68 @@ export const handleMenuCallback = async (ctx: Context): Promise<void> => {
   
   const action = match[1];
   
-  // Handle different menu actions
+  // Handle different menu actions by directly executing the handler functions
   switch (action) {
     case 'profile':
       // First acknowledge the callback
       await ctx.answerCbQuery();
-      // Then send the command to trigger the handler
-      await ctx.reply('/profile');
+      // Then execute the handler directly instead of sending a command
+      await handleProfile(ctx);
       break;
       
     case 'logout':
       await ctx.answerCbQuery();
-      await ctx.reply('/logout');
+      await handleLogout(ctx);
       break;
       
     case 'balance':
       await ctx.answerCbQuery();
-      await ctx.reply('/balance');
+      await handleBalance(ctx);
       break;
       
     case 'wallets':
       await ctx.answerCbQuery();
-      await ctx.reply('/wallets');
+      await handleWallets(ctx);
       break;
       
     case 'deposit':
       await ctx.answerCbQuery();
-      await ctx.reply('/deposit');
+      await handleDeposit(ctx);
       break;
       
     case 'set_default_wallet':
       await ctx.answerCbQuery();
-      await ctx.reply('/set_default_wallet');
+      await handleSetDefaultWallet(ctx);
       break;
       
     case 'send':
       await ctx.answerCbQuery();
-      await ctx.reply('/send');
+      await handleSendCommand(ctx);
       break;
       
     case 'transfers':
       await ctx.answerCbQuery();
-      await ctx.reply('/transfers');
+      await handleTransferHistory(ctx);
       break;
       
     case 'login':
       await ctx.answerCbQuery();
-      await ctx.reply('/login');
+      await handleLogin(ctx);
       break;
       
     case 'help':
       await ctx.answerCbQuery();
-      await ctx.reply('/help');
+      await handleHelp(ctx);
       break;
       
     case 'support':
       await ctx.answerCbQuery();
-      await ctx.reply('/support');
+      await handleSupport(ctx);
       break;
       
     case 'menu':
       await ctx.answerCbQuery();
-      await ctx.reply('/menu');
+      await handleMenu(ctx);
       break;
       
     default:
@@ -203,7 +206,7 @@ export const handleHelpCallback = async (ctx: Context): Promise<void> => {
   
   if (callbackData === 'help:back_to_menu') {
     await ctx.answerCbQuery();
-    await ctx.reply('/menu');
+    await handleMenu(ctx);
   }
 };
 
@@ -243,6 +246,6 @@ export const handleSupportCallback = async (ctx: Context): Promise<void> => {
   
   if (callbackData === 'support:back_to_menu') {
     await ctx.answerCbQuery();
-    await ctx.reply('/menu');
+    await handleMenu(ctx);
   }
 }; 

@@ -67,8 +67,16 @@ export const handleLogout = async (ctx: Context): Promise<void> => {
   // Clear session data
   clearSession(chatId);
   
+  // Create keyboard with login button
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '🔑 Login Again', callback_data: 'menu:login' }]
+    ]
+  };
+  
   await ctx.reply(
-    `You have been logged out. Use /login to authenticate again.`
+    `You have been logged out successfully.`,
+    { reply_markup: keyboard }
   );
 };
 
@@ -149,8 +157,16 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
   const email = getTempData(chatId, 'email');
   
   if (!email) {
+    // Create login button
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '🔑 Login', callback_data: 'menu:login' }]
+      ]
+    };
+    
     await ctx.reply(
-      `Session expired. Please start the login process again with /login.`
+      `Session expired. Please start the login process again.`,
+      { reply_markup: keyboard }
     );
     return;
   }
@@ -220,11 +236,21 @@ export const handleOtpInput = async (ctx: Context): Promise<void> => {
       }
     }
     
+    // Create keyboard with menu and help buttons
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '📋 View Menu', callback_data: 'menu:menu' }],
+        [{ text: '❓ Help', callback_data: 'menu:help' }]
+      ]
+    };
+    
     await ctx.reply(
       `🎉 Login successful! Welcome ${userData.name || userData.email}!\n\n` +
-      `${kycStatusMessage}\n\n` +
-      `Use /menu to see available options or /help for commands.`,
-      { parse_mode: 'Markdown' }
+      `${kycStatusMessage}`,
+      { 
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      }
     );
   } else {
     // More robust error message extraction
@@ -382,106 +408,54 @@ export const handleProfile = async (ctx: Context): Promise<void> => {
         kycStatus = approvedKyc ? 'Approved ✅' : 'Not approved ❌';
       }
       
-      const profileMessage = `👤 *User Profile*\n\n` +
-      `Email: ${userData.email || 'Not available'}\n` +
-      `Name: ${userData.name || 'Not set'}\n` +
+      const profileMessage = `👤 *Profile Information*\n\n` +
+      `Name: ${userData.name || 'Not provided'}\n` +
+      `Email: ${userData.email || 'Not provided'}\n` +
+      `Organization ID: ${userData.organizationId || 'Not provided'}\n` +
       `KYC Status: ${kycStatus}\n` +
-      `Organization ID: ${userData.organizationId || 'Not available'}\n` +
-      `Account Type: ${userData.role || 'User'}`;
+      `Role: ${userData.role || 'User'}`;
       
-      console.log('[Handler] Sending profile message:', profileMessage);
+      // Create a button to go back to menu
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Menu', callback_data: 'menu:menu' }]
+        ]
+      };
       
-      await ctx.reply(
-        profileMessage,
-        { parse_mode: 'Markdown' }
-      );
-    } else {
-      // Handle specific error cases with actionable messages
-      let errorMessage = response.message || 'Unknown error';
-      let actionMessage = 'Please try again later or contact support.';
-      
-      if (errorMessage.includes('not logged in') || errorMessage.includes('expired')) {
-        actionMessage = 'Please use /login to authenticate again.';
-      } else if (errorMessage.includes('server')) {
-        actionMessage = 'This may be a temporary issue. Please try again in a few minutes.';
-      }
-      
-      console.log('[Handler] Error fetching profile:', errorMessage);
-      
-      await ctx.reply(
-        `❌ Failed to fetch profile: ${errorMessage}\n\n` +
-        `${actionMessage}\n\n` +
-        `Support: https://t.me/copperxcommunity/2183`
-      );
+      await ctx.reply(profileMessage, { 
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
     }
   } catch (error) {
-    // Clean up loading message if still present
-    if (ctx.chat) {
-      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id).catch(() => {});
-    }
-    
-    console.error('[Handler] Unexpected error in handleProfile:', error);
-    
+    console.error('Error fetching profile:', error);
     await ctx.reply(
-      `❌ An unexpected error occurred while fetching your profile.\n\n` +
-      `Please try again later or contact support at https://t.me/copperxcommunity/2183`
+      `❌ An error occurred while fetching your profile. Please try again later.`
     );
   }
 };
 
 // Helper function to format validation errors
-function formatValidationErrors(errors: any[]): string {
+const formatValidationErrors = (errors: any[]): string => {
   if (!Array.isArray(errors) || errors.length === 0) {
-    return 'Validation failed';
+    return 'Validation error';
   }
-  
-  const formattedErrors: string[] = [];
-  
-  for (const error of errors) {
-    if (error.property) {
-      const propertyName = formatPropertyName(error.property);
-      
-      if (error.constraints) {
-        const constraints = Object.keys(error.constraints);
-        if (constraints.length > 0) {
-          if (constraints.includes('isNotEmpty') || constraints.includes('required')) {
-            formattedErrors.push(`${propertyName} is required`);
-          } else if (constraints.includes('isString')) {
-            formattedErrors.push(`${propertyName} must be text`);
-          } else if (constraints.includes('isNumber') || constraints.includes('isInt')) {
-            formattedErrors.push(`${propertyName} must be a number`);
-          } else if (constraints.includes('isEmail')) {
-            formattedErrors.push(`${propertyName} must be a valid email address`);
-          } else {
-            formattedErrors.push(`${propertyName} is invalid`);
-          }
-        } else {
-          formattedErrors.push(`${propertyName} is invalid`);
-        }
-      } else {
-        formattedErrors.push(`${propertyName} is invalid`);
-      }
-    }
-  }
-  
-  return formattedErrors.length > 0
-    ? `Validation failed: ${formattedErrors.join(', ')}`
-    : 'Validation failed';
-}
 
-// Helper function to format property names (e.g., convert camelCase to Title Case)
-function formatPropertyName(property: string): string {
-  // Special case for common acronyms
-  if (property.toLowerCase() === 'otp') return 'Verification code';
-  if (property.toLowerCase() === 'id') return 'ID';
-  
-  // Convert camelCase or snake_case to Title Case with spaces
-  return property
-    // Insert a space before uppercase letters
-    .replace(/([A-Z])/g, ' $1')
-    // Replace underscores with spaces
-    .replace(/_/g, ' ')
-    // Capitalize first letter and trim
-    .replace(/^./, str => str.toUpperCase())
-    .trim();
-} 
+  // Try different validation error formats
+  if (typeof errors[0] === 'string') {
+    return errors[0];
+  }
+
+  if (errors[0].message) {
+    return errors[0].message;
+  }
+
+  if (errors[0].constraints) {
+    // Get the first constraint message
+    const constraints = errors[0].constraints;
+    return Object.values(constraints)[0] as string;
+  }
+
+  // Fallback to generic message
+  return 'Invalid input provided';
+};
