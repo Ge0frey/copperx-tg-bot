@@ -71,13 +71,21 @@ export const handleSendCommand = async (ctx: Context): Promise<void> => {
   // Update state
   updateState(chatId, BotState.TRANSFER_MENU);
   
-  // Create inline keyboard with transfer options
+  // Create inline keyboard with transfer options - improved layout
   const keyboard = {
     inline_keyboard: [
-      [{ text: '📧 Send to Email', callback_data: 'transfer:email' }],
-      [{ text: '🔐 Send to Wallet', callback_data: 'transfer:wallet' }],
+      // First row with two options
+      [
+        { text: '📧 Send to Email', callback_data: 'transfer:email' },
+        { text: '🔐 Send to Wallet', callback_data: 'transfer:wallet' }
+      ],
+      // Second row with bank option
       [{ text: '🏦 Withdraw to Bank', callback_data: 'transfer:bank' }],
-      [{ text: '❌ Cancel', callback_data: 'transfer:cancel' }]
+      // Third row with back and cancel
+      [
+        { text: '🔙 Back to Menu', callback_data: 'menu:menu' },
+        { text: '❌ Cancel', callback_data: 'transfer:cancel' }
+      ]
     ]
   };
   

@@ -28,11 +28,23 @@ export const handleStart = async (ctx: Context): Promise<void> => {
   // Reset state
   updateState(chatId, BotState.START);
   
+  // Create inline keyboard with main actions
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '🔑 Login', callback_data: 'menu:login' }],
+      [{ text: '📋 Menu', callback_data: 'start:menu' }],
+      [{ text: '❓ Help', callback_data: 'menu:help' }]
+    ]
+  };
+  
   await ctx.reply(
-    `👋 Welcome to the *Copperx Payment Bot*!\n\n` +
+    `👋 *Welcome to the Copperx Payment Bot!*\n\n` +
     `This bot allows you to manage your Copperx wallet, make transfers, and monitor your account.\n\n` +
-    `Please use /login to authenticate with your Copperx account or /help to see available commands.`,
-    { parse_mode: 'Markdown' }
+    `Please login to access all features, or browse the menu to learn more.`,
+    { 
+      parse_mode: 'Markdown',
+      reply_markup: keyboard 
+    }
   );
 };
 

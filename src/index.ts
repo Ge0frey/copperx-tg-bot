@@ -41,7 +41,10 @@ import {
 import {
   handleMenu,
   handleHelp,
-  handleSupport
+  handleSupport,
+  handleMenuCallback,
+  handleHelpCallback,
+  handleSupportCallback
 } from './handlers/menuHandlers';
 
 // Add this interface at the top of the file after the imports
@@ -103,6 +106,15 @@ bot.on('callback_query', async (ctx) => {
     await handleNetworkCallback(ctx);
   } else if (callbackData.startsWith('confirm_') || callbackData === 'cancel_transfer') {
     await handleTransferConfirmation(ctx);
+  } else if (callbackData.startsWith('menu:')) {
+    await handleMenuCallback(ctx);
+  } else if (callbackData.startsWith('help:')) {
+    await handleHelpCallback(ctx);
+  } else if (callbackData.startsWith('support:')) {
+    await handleSupportCallback(ctx);
+  } else if (callbackData === 'start:menu') {
+    await ctx.answerCbQuery();
+    await ctx.reply('/menu');
   }
 });
 
